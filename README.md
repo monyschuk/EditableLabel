@@ -6,7 +6,7 @@ SwiftUI's TextField component for OSX works well in standard form-style interfac
 `EditableLabel` offers a `text` binding, optional min- and max- width constraints, with scrolling or line wrapping support. Its two associated closures - `didChange` and `didEndEditing` differ slightly from their equivalents on `TextField` in that both provide the current string value as an argument. The `didEndEditing` closure also returns a `Bool` value which, if true, will dismiss the field editor. 
 
 ## Sample Body Usage
-
+Here's some code from a scratchpad View I've created, showing how `EditableLabel` can be used:
 
 ```
     var body: some View {
@@ -15,7 +15,7 @@ SwiftUI's TextField component for OSX works well in standard form-style interfac
                 page in
                 
                 // NOTE: since `didEndEditing` is passed the string value
-                // we don't strictly need to maintain an @State variable to
+                // we don't strictly need to maintain an @State property to
                 // track the field's contents, and can pass a `.constant(...)` 
                 // binding instead. This is optional, but can be handy at times.
                 
@@ -30,3 +30,10 @@ SwiftUI's TextField component for OSX works well in standard form-style interfac
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 ```
+
+## TODOs or Welcomed PRs
+More configuration, formatter support, I'm sure there's lots...
+
+## License
+
+MIT
