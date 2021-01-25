@@ -88,33 +88,71 @@ final class EditableLabelCoordinator: NSObject, NSTextFieldDelegate {
 
 final class EditableLabelView: NSTextField {
     var minWidth: CGFloat? {
-        didSet { needsUpdateConstraints = true }
+        didSet {
+            needsUpdate()
+        }
     }
     
     var maxWidth: CGFloat? {
-        didSet { needsUpdateConstraints = true }
-    }
-    
-    override func updateConstraints() {
-        super.updateConstraints()
-        
-        if let width = minWidth {
-            widthAnchor.constraint(greaterThanOrEqualToConstant: width).isActive = true
-        }
-        if let width = maxWidth {
-            widthAnchor.constraint(lessThanOrEqualToConstant: width).isActive = true
+        didSet {
+            needsUpdate()
         }
     }
+
+    lazy var maxConstraint: NSLayoutConstraint = {
+        return widthAnchor.constraint(lessThanOrEqualToConstant: 1)
+    }()
+    lazy var minConstraint: NSLayoutConstraint = {
+        return widthAnchor.constraint(greaterThanOrEqualToConstant: 1)
+    }()
     
+
+    @IBInspectable
     var wraps: Bool = false {
         didSet {
             if let cell = cell as? NSTextFieldCell {
                 cell.wraps = wraps
                 cell.isScrollable = !wraps
             }
+            needsUpdate()
+        }
+    }
+
+    private func needsUpdate() {
+        self.needsUpdateConstraints = true
+    }
+    override func updateConstraints() {
+        super.updateConstraints()
+        
+        minConstraint.isActive = false
+        maxConstraint.isActive = false
+        
+        if wraps {
+            let minW = minWidth ?? -1
+            let maxW = maxWidth ?? -1
+
+            let width = max(minW, maxW)
+
+            if width != -1 {
+                minConstraint.constant = width
+                minConstraint.isActive = true
+                
+                maxConstraint.constant = width
+                maxConstraint.isActive = true
+            }
+        } else {
+            if let width = minWidth {
+                minConstraint.constant = width
+                minConstraint.isActive = true
+            }
+            if let width = maxWidth {
+                maxConstraint.constant = width
+                maxConstraint.isActive = true
+            }
         }
     }
     
+
     // MARK: - Layout
     
     @objc override func textDidChange(_ notification: Notification) {
@@ -123,7 +161,7 @@ final class EditableLabelView: NSTextField {
     }
     
     override var intrinsicContentSize: NSSize {
-        var intrinsicContentSize: NSSize = NSSize.zero
+        var size = CGSize.zero
         
         if let fieldEditor = self.currentEditor() as? NSTextView, let clipView = fieldEditor.superview as? NSClipView {
             if wraps {
@@ -148,9 +186,9 @@ final class EditableLabelView: NSTextField {
                 
                 if wraps {
                     let minHeight = layoutManager.defaultLineHeight(for: font!)
-                    intrinsicContentSize = NSSize(width: -1, height: max(NSHeight(usedRect), minHeight) + clipDelta.height)
+                    size = NSSize(width: NSView.noIntrinsicMetric, height: max(NSHeight(usedRect), minHeight) + clipDelta.height)
                 } else {
-                    intrinsicContentSize = NSSize(width: ceil(NSWidth(usedRect) + clipDelta.width), height: NSHeight(usedRect) + clipDelta.height)
+                    size = NSSize(width: ceil(NSWidth(usedRect) + clipDelta.width), height: NSHeight(usedRect) + clipDelta.height)
                 }
             }
         } else {
@@ -159,22 +197,31 @@ final class EditableLabelView: NSTextField {
                     // oddly, this sometimes gives incorrect results -
                     // if anyone has any ideas please issue a pull request
                     
-                    intrinsicContentSize = cell.cellSize(forBounds: NSMakeRect(0, 0, NSWidth(bounds), CGFloat.greatestFiniteMagnitude))
+                    size = cell.cellSize(forBounds: NSMakeRect(0, 0, NSWidth(bounds), CGFloat.greatestFiniteMagnitude))
                     
-                    intrinsicContentSize.width = -1
-                    intrinsicContentSize.height = ceil(intrinsicContentSize.height)
+                    size.width = NSView.noIntrinsicMetric
+                    size.height = ceil(size.height)
                     
                 } else {
-                    intrinsicContentSize = cell.cellSize(forBounds: NSMakeRect(0, 0, CGFloat.greatestFiniteMagnitude, CGFloat.greatestFiniteMagnitude))
+                    size = cell.cellSize(forBounds: NSMakeRect(0, 0, CGFloat.greatestFiniteMagnitude, CGFloat.greatestFiniteMagnitude))
                     
-                    intrinsicContentSize.width = ceil(intrinsicContentSize.width)
-                    intrinsicContentSize.height = ceil(intrinsicContentSize.height)
+                    size.width = ceil(size.width)
+                    size.height = ceil(size.height)
                 }
             }
         }
         
-        return intrinsicContentSize
+        if let font = self.font {
+            size.height = max(
+                EditableLabelView.lm.defaultLineHeight(for: font),
+                size.height
+            )
+        }
+        
+        return size
     }
+    
+    private static var lm = NSLayoutManager()
     
     // MARK: - Lifecycle
     
@@ -184,7 +231,7 @@ final class EditableLabelView: NSTextField {
     }
     required init?(coder: NSCoder) {
         super.init(coder: coder)
-        configure(text: nil)
+        configure(text: stringValue)
     }
     
     private func configure(text: String?) {
